@@ -1,0 +1,110 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <windows.h>
+
+// ...（结构体与链表操作同 Commit 2，此处省略，实际使用时保留）...
+
+// 闹钟监控线程
+DWORD WINAPI AlarmMonitor(LPVOID lpParam) {
+    while (1) {
+        time_t raw;
+        struct tm* now;
+        time(&raw);
+        now = localtime(&raw);
+        int cur_h = now->tm_hour;
+        int cur_m = now->tm_min;
+        int cur_s = now->tm_sec;
+
+        Alarm *prev = NULL, *curr = g_alarmList;
+        while (curr) {
+            if (!curr->triggered &&
+                curr->hour == cur_h &&
+                curr->minute == cur_m &&
+                curr->second == cur_s) {
+                printf("闹钟触发！ %02d:%02d:%02d\n", 
+                       curr->hour, curr->minute, curr->second);
+                curr->triggered = 1;
+            }
+            if (curr->triggered) {
+                Alarm* toDel = curr;
+                if (prev) prev->next = curr->next;
+                else g_alarmList = curr->next;
+                curr = curr->next;
+                free(toDel);
+                continue;
+            }
+            prev = curr;
+            curr = curr->next;
+        }
+        Sleep(200);
+    }
+    return 0;
+}
+
+// 键盘监听线程（模拟A添加、D删除、ESC退出）
+DWORD WINAPI KeyboardThread(LPVOID lpParam) {
+    while (1) {
+        if (GetAsyncKeyState('A') & 0x8000) {
+            // 简单添加：当前时间+10秒
+            time_t raw;
+            struct tm* now;
+            time(&raw);
+            now = localtime(&raw);
+            int h = now->tm_hour;
+            int m = now->tm_min;
+            int s = now->tm_sec + 10;
+            if (s >= 60) { s -= 60; m++; }
+            if (m >= 60) { m -= 60; h++; }
+            if (h >= 24) h -= 24;
+            AddAlarm(h, m, s);
+            printf("添加闹钟：%02d:%02d:%02d\n", h, m, s);
+            Sleep(300);
+        }
+        if (GetAsyncKeyState('D') & 0x8000) {
+            int cnt = GetAlarmCount();
+            if (cnt > 0) {
+                DeleteAlarmByIndex(cnt - 1);
+                printf("删除最后一个闹钟\n");
+            }
+            Sleep(300);
+        }
+        if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
+            exit(0);
+        }
+        Sleep(50);
+    }
+    return 0;
+}
+
+int main() {
+    // 添加两个测试闹钟
+    time_t raw;
+    struct tm* now;
+    time(&raw);
+    now = localtime(&raw);
+    AddAlarm(now->tm_hour, now->tm_min, now->tm_sec + 15);
+    AddAlarm(now->tm_hour, now->tm_min, now->tm_sec + 30);
+
+    // 创建线程
+    CreateThread(NULL, 0, AlarmMonitor, NULL, 0, NULL);
+    CreateThread(NULL, 0, KeyboardThread, NULL, 0, NULL);
+
+    // 主线程只负责界面刷新（清屏+打印）
+    while (1) {
+        system("cls");
+        time(&raw);
+        now = localtime(&raw);
+        printf("当前时间：%02d:%02d:%02d\n", 
+               now->tm_hour, now->tm_min, now->tm_sec);
+        // 打印闹钟列表（简单遍历）
+        Alarm* p = g_alarmList;
+        int idx = 0;
+        while (p) {
+            printf("%d. %02d:%02d:%02d\n", idx++, p->hour, p->minute, p->second);
+            p = p->next;
+        }
+        Sleep(1000);
+    }
+    return 0;
+}
