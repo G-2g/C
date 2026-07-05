@@ -1,0 +1,60 @@
+#include <graphics.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <windows.h>
+
+// ...（结构体与链表操作同前，此处省略）...
+
+void DrawInterface(int h, int m, int s) {
+    cleardevice();
+    // 绘制时间
+    settextstyle(64, 0, _T("Consolas"));
+    setcolor(RGB(255, 100, 0));
+    TCHAR timeStr[20];
+    _stprintf_s(timeStr, _T("%02d:%02d:%02d"), h, m, s);
+    outtextxy(100, 100, timeStr);
+
+    // 绘制闹钟列表
+    settextstyle(20, 0, _T("宋体"));
+    setcolor(WHITE);
+    outtextxy(50, 200, _T("闹钟列表 (A-添加, D-删除, ESC-退出):"));
+    Alarm* p = g_alarmList;
+    int y = 230;
+    int idx = 0;
+    while (p) {
+        TCHAR buf[128];
+        _stprintf_s(buf, _T("%d. %02d:%02d:%02d"), idx++, p->hour, p->minute, p->second);
+        outtextxy(60, y, buf);
+        y += 25;
+        p = p->next;
+    }
+    FlushBatchDraw();
+}
+
+int main() {
+    initgraph(500, 400);
+    setbkcolor(BLACK);
+    BeginBatchDraw();
+
+    // 预设测试闹钟
+    time_t raw;
+    struct tm* now;
+    time(&raw);
+    now = localtime(&raw);
+    AddAlarm(now->tm_hour, now->tm_min, now->tm_sec + 15);
+    AddAlarm(now->tm_hour, now->tm_min, now->tm_sec + 30);
+
+    CreateThread(NULL, 0, AlarmMonitor, NULL, 0, NULL);
+    CreateThread(NULL, 0, KeyboardThread, NULL, 0, NULL);
+
+    while (1) {
+        time(&raw);
+        now = localtime(&raw);
+        DrawInterface(now->tm_hour, now->tm_min, now->tm_sec);
+        Sleep(1000);
+    }
+
+    closegraph();
+    return 0;
+}
