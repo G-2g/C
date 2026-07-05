@@ -1,0 +1,52 @@
+// 在全局区域添加
+CRITICAL_SECTION cs;
+
+// 修改所有链表操作函数，在开头加锁，结尾解锁
+void AddAlarm(int h, int m, int s) {
+    EnterCriticalSection(&cs);
+    // ... 原有 malloc 和链接代码 ...
+    LeaveCriticalSection(&cs);
+}
+
+void DeleteAlarmByIndex(int index) {
+    EnterCriticalSection(&cs);
+    // ... 原有删除代码 ...
+    LeaveCriticalSection(&cs);
+}
+
+int GetAlarmCount() {
+    int cnt = 0;
+    EnterCriticalSection(&cs);
+    // ... 遍历计数 ...
+    LeaveCriticalSection(&cs);
+    return cnt;
+}
+
+// 在 DrawInterface 和 AlarmMonitor 中遍历链表时也要加锁
+void DrawInterface(...) {
+    // ...
+    EnterCriticalSection(&cs);
+    Alarm* p = g_alarmList;
+    while (p) { /* 绘制 */ }
+    LeaveCriticalSection(&cs);
+    // ...
+}
+
+DWORD WINAPI AlarmMonitor(...) {
+    while (1) {
+        // ...
+        EnterCriticalSection(&cs);
+        // 遍历并可能删除节点
+        LeaveCriticalSection(&cs);
+        Sleep(200);
+    }
+}
+
+// main 函数中初始化临界区
+int main() {
+    initgraph(500, 400);
+    // ...
+    InitializeCriticalSectionAndSpinCount(&cs, 4000);
+    // ...
+    // 程序结束前销毁（但无限循环，可忽略）
+}
